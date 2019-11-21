@@ -16,14 +16,7 @@ D2value = 0;
 zone_sum = 0;
 
 save_loc = fullfile(folder, ['recording_' datestr(now,1) '.mat']);
-if exist(save_loc,'file')
-    if ~strcmpi(save_loc(end-5),'-')
-        save_loc = fullfile(folder, ['recording_' datestr(now,1) '-1.mat']);
-    elseif strcmpi(save_loc(end-5),'-')
-        curr_version = str2num(save_loc(end-4));
-        save_loc = fullfile(folder, ['recording_' datestr(now,1) '-' num2str(curr_version+1) '.mat']);
-    end
-end
+if exists(save_loc
 
 run_time = 60*60; %seconds
 SR = 20; %Hz
@@ -162,7 +155,6 @@ zone_thresh = 3;
 % than zone_thresh seconds
 if all(delta_pos == 0) || zone_sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 0.05 %
     trigger_off(a, ax, ht, pos_curr)
-    trig_on = [trig_on; 0];
     if (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2))
         zone_sum = 0; % reset time in trigger zone to 0
     end
