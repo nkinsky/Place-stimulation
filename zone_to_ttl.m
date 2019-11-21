@@ -1,13 +1,21 @@
-function [] = zone_to_ttl(debug)
+function [] = zone_to_ttl(folder,debug)
 % Function to ID track and zones to trigger TTL out pulses
 
-if nargin < 1
+if nargin < 2
     debug = false;
 end
 clear global
 global D2value
+global D2sum
 global pos
+global time
+global trig_on
+global save_loc
+global SR
 D2value = 0;
+D2sum = 0;
+
+save_loc = fullfile(folder, ['recording_' datestr(now,1) '.mat']);
 
 run_time = 60*60; %seconds
 SR = 20; %Hz
@@ -15,6 +23,8 @@ SR = 20; %Hz
 % Construct pos vector to keep track of last 0.25 seconds
 nquarter = ceil(SR/4); % #samples in a quarter second
 pos = repmat([0 0 -500], nquarter, 1); % Start pos with z-position waaaay off
+time = [];
+trig_on = [];
 
 % Make sure track is aligned with z axis in optitrack calibration first!
 % Connect to optitrack
@@ -38,7 +48,8 @@ if ~debug
         a = arduino;
         configurePin(a,'D2','DigitalOutput');
     catch
-        disp('error connecting to arduino - running in debug mode')
+        disp('WARNING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        disp('ERROR connecting to arduino - running in debug mode')
         debug = true;
     end
 end
@@ -56,12 +67,12 @@ if debug
 end
 
 %Get track ends
-input('Put rigid body at start of the track. Hit enter when done');
+input('Put rigid body at start of the track. Hit enter when done','s');
 capture_pos(trackobj);
 start_pos = pos(end,:);
 % start_pos = [-0.2557 0.1353 -3.6050]; % For debugging only
 
-input('Put rigid body at end of the track. Hit enter when done');
+input('Put rigid body at end of the track. Hit enter when done','s');
 capture_pos(trackobj);
 end_pos = pos(end,:);
 % end_pos = [-0.3754 0.2064 3.8861]; % For debugging only
@@ -85,6 +96,8 @@ ttl_zzone = [start_pos(3) + track_zdist/3, start_pos(3) + track_zdist*2/3];
 disp(['zone start = ' num2str(ttl_zone(1),'%0.2g')])
 disp(['zone end = ' num2str(ttl_zone(2),'%0.2g')])
 
+input('Ready to rock and roll. Hit enter when ready!','s');
+
 % Start timer to check every SR Hz if rat is in the stim zone.
 t = timer('TimerFcn', @(x,y)zone_detect(trackobj, a, ax, ht, ttl_zone, theta, center), ...
     'Period', 1/SR, ...
@@ -106,8 +119,10 @@ end
 function [delta_pos] = capture_pos(c)
 % adjust this to get delta pos from 0.25 sec prior!!!
 global pos
+global time
 
 frame = c.getFrame; % get frame
+time = [time; frame.Timestamp];
 
 % Add position to bottom of position tally
 pos = [pos; frame.RigidBody(1).x, frame.RigidBody(1).y, frame.RigidBody(1).z];
@@ -123,28 +138,39 @@ end
 %% Detect if in zone and trigger
 function [] = zone_detect(c, a, ax, ht, ttl_zone, theta, center)
 global pos
+global time
+global trig_on
+global save_loc
+global D2sum
+global SR
 delta_pos = capture_pos(c); % get position
 pos_curr = pos(end,:);
 
 pos_s = cart_to_track(pos_curr, theta, center);
 
+zone_thresh = 3;
 % Turn TTL off if rat's position has not changed at all (most likely
-% optitrack can't find it)
-if all(delta_pos == 0)
+% optitrack can't find it) OR if rat is chilling within zone for greater
+% than zone_thresh seconds
+if all(delta_pos == 0) || D2sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 0.05 %
     trigger_off(a, ax, ht, pos_curr)
     
 else % Logic to trigger is the rat is in the appropriate zone below
 %     Send D2 to 5V if in zone and currently at 0
     if (pos_s > ttl_zone(1)) && (pos_s < ttl_zone(2)) %pos_curr(3) > ttl_zone(1) && pos_curr(3) < ttl_zone(2)
         trigger_on(a, ax, ht, pos_s)
+        trig_on = [trig_on; 1];
         
 %         Send D2 to 0V if outside of zone and currently at 5V
     elseif (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2)) %(pos_curr(3) <= ttl_zone(1)) || (pos_curr(3) >= ttl_zone(2))
         trigger_off(a, ax, ht, pos_s)
+        trig_on = [trig_on; 0];
         
     end
     
 end
+
+save(save_loc, 'time', 'pos_s', 'trig_on');
 
 end
 
@@ -152,7 +178,9 @@ end
 function [] = trigger_on(a, ax, ht, pos_curr)
 
 global D2value
+global D2sum
 D2value = 1;
+D2sum = D2sum + 1;
 % text_append = '';
 
 if length(pos_curr) == 3
@@ -177,6 +205,7 @@ function [] = trigger_off(a, ax, ht, pos_curr)
 
 global D2value
 D2value = 0;
+D2sum = 0;
 % text_append = '';
 
 if length(pos_curr) == 3
