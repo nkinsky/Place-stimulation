@@ -8,7 +8,10 @@ clear global
 global D2value
 global zone_sum
 global pos
-global time
+global pos_opti
+global pos_lin
+global time_opti
+global time_mat
 global trig_on
 global save_loc
 global SR
@@ -32,7 +35,10 @@ SR = 20; %Hz
 % Construct pos vector to keep track of last 0.25 seconds
 nquarter = ceil(SR/4); % #samples in a quarter second
 pos = repmat([0 0 -500], nquarter, 1); % Start pos with z-position waaaay off
-time = [];
+pos_opti = [];
+pos_lin = [];
+time_opti = [];
+time_mat = [];
 trig_on = [];
 
 % Make sure track is aligned with z axis in optitrack calibration first!
@@ -56,6 +62,7 @@ if ~debug
         % now connect
         a = arduino;
         configurePin(a,'D2','DigitalOutput');
+        configurePin(a,'D4','DigitalOutput');
     catch
         disp('WARNING!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         disp('ERROR connecting to arduino - running in debug mode')
@@ -109,7 +116,7 @@ input('Ready to rock and roll. Hit enter when ready!','s');
 
 % Start timer to check every SR Hz if rat is in the stim zone.
 t = timer('TimerFcn', @(x,y)zone_detect(trackobj, ax, ht, ttl_zone, theta, center), ...
-    'Period', 1/SR, ...
+    'StartFcn', @(x,y)send_start(), 'StopFcn', @(x,y)send_end(), 'Period', 1/SR, ...
     'ExecutionMode', 'fixedRate', 'TasksToExecute', SR*run_time); %, ...
 %     'StopFcn', @(x,y)trigger_off(a, ax, ht, pos));
 
@@ -129,17 +136,37 @@ keyboard
 
 end
 
+%% Start recording marker
+function [] = send_start()
+global a
+writeDigitalPin(a,'D4',1);
+
+end
+
+%% End recording marker
+function [] = send_end()
+global a
+writeDigitalPin(a,'D4',0);
+end
+
+
 %% Capture live position
 function [delta_pos] = capture_pos(c)
 % adjust this to get delta pos from 0.25 sec prior!!!
 global pos
-global time
+global pos_opti
+global time_opti
+global time_mat
 
 frame = c.getFrame; % get frame
-time = [time; frame.Timestamp];
+time_opti = [time_opti; frame.Timestamp];
+time_mat = [time_mat; clock];
 
 % Add position to bottom of position tally
-pos = [pos; frame.RigidBody(1).x, frame.RigidBody(1).y, frame.RigidBody(1).z];
+pos = [pos; ...
+    frame.RigidBody(1).x, frame.RigidBody(1).y, frame.RigidBody(1).z];
+pos_opti = [pos_opti; ...
+    frame.RigidBody(1).x, frame.RigidBody(1).y, frame.RigidBody(1).z];
 
 % get change in position from  0.25 seconds ago
 delta_pos = pos(end,:) - pos(1,:);
@@ -152,16 +179,19 @@ end
 %% Detect if in zone and trigger
 function [] = zone_detect(c, ax, ht, ttl_zone, theta, center)
 global pos
-global time
+global pos_opti
+global time_opti
+global time_mat
+global pos_lin
 global trig_on
 global save_loc
 global zone_sum
 global SR
-global a
 
 delta_pos = capture_pos(c); % get position
 pos_curr = pos(end,:);
 pos_s = cart_to_track(pos_curr, theta, center);
+pos_lin = [pos_lin; pos_s];
 
 % Turn TTL off if rat's position has not changed at all (most likely
 % optitrack can't find it) OR if rat is chilling within zone for greater
@@ -191,7 +221,7 @@ else % Logic to trigger is the rat is in the appropriate zone below
     
 end
 
-save(save_loc, 'time', 'pos_s', 'trig_on');
+save(save_loc, 'time_opti', 'time_mat', 'pos_lin', 'pos_opti', 'trig_on');
 
 end
 
@@ -272,10 +302,8 @@ function myCleanupFun(t, ax, ht)
 
 global a
 
-%  try
-
     trigger_off(ax, ht, nan)
-    keyboard
+    send_end();
     clear a
 
     try
@@ -283,7 +311,7 @@ global a
         delete(instrfindall)
     end
     stop(t)
-    clear global
+%     clear global
 
     close(ax.Parent(1))
     disp('cleanup function ran!')
