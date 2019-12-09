@@ -12,11 +12,12 @@ global time
 global trig_on
 global save_loc
 global SR
+global a
 D2value = 0;
 zone_sum = 0;
 
 save_loc = fullfile(folder, ['recording_' datestr(now,1) '.mat']);
-if exist(save_loc,'file')
+while exist(save_loc,'file')
     if ~strcmpi(save_loc(end-5),'-')
         save_loc = fullfile(folder, ['recording_' datestr(now,1) '-1.mat']);
     elseif strcmpi(save_loc(end-5),'-')
@@ -107,19 +108,24 @@ disp(['zone end = ' num2str(ttl_zone(2),'%0.2g')])
 input('Ready to rock and roll. Hit enter when ready!','s');
 
 % Start timer to check every SR Hz if rat is in the stim zone.
-t = timer('TimerFcn', @(x,y)zone_detect(trackobj, a, ax, ht, ttl_zone, theta, center), ...
+t = timer('TimerFcn', @(x,y)zone_detect(trackobj, ax, ht, ttl_zone, theta, center), ...
     'Period', 1/SR, ...
     'ExecutionMode', 'fixedRate', 'TasksToExecute', SR*run_time); %, ...
 %     'StopFcn', @(x,y)trigger_off(a, ax, ht, pos));
 
 % Create cleanup function
-cleanup = onCleanup(@()myCleanupFun(t, a, ax, ht, pos));
+cleanup = onCleanup(@()myCleanupFun(t, ax, ht));
 
 % start function!
 start(t)
 figure(hf); % bring figure to front
 
-pause(run_time+3); % Don't get out of function until timer is done running
+% While loop here - should be able to start or stop timer! maybe keyboard
+% statement? yes!
+disp('Type "stop(t); dbcont" to finish and save')
+keyboard
+
+% pause(run_time+3); % Don't get out of function until timer is done running
 
 end
 
@@ -144,24 +150,25 @@ pos = pos(2:end,:);
 end
 
 %% Detect if in zone and trigger
-function [] = zone_detect(c, a, ax, ht, ttl_zone, theta, center)
+function [] = zone_detect(c, ax, ht, ttl_zone, theta, center)
 global pos
 global time
 global trig_on
 global save_loc
 global zone_sum
 global SR
+global a
+
 delta_pos = capture_pos(c); % get position
 pos_curr = pos(end,:);
-
 pos_s = cart_to_track(pos_curr, theta, center);
 
-zone_thresh = 3;
 % Turn TTL off if rat's position has not changed at all (most likely
 % optitrack can't find it) OR if rat is chilling within zone for greater
 % than zone_thresh seconds
+zone_thresh = 3;
 if all(delta_pos == 0) || zone_sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 0.05 %
-    trigger_off(a, ax, ht, pos_curr)
+    trigger_off(ax, ht, pos_curr)
     trig_on = [trig_on; 0];
     if (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2))
         zone_sum = 0; % reset time in trigger zone to 0
@@ -170,13 +177,13 @@ if all(delta_pos == 0) || zone_sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 
 else % Logic to trigger is the rat is in the appropriate zone below
 %     Send D2 to 5V if in zone and currently at 0
     if (pos_s > ttl_zone(1)) && (pos_s < ttl_zone(2)) %pos_curr(3) > ttl_zone(1) && pos_curr(3) < ttl_zone(2)
-        trigger_on(a, ax, ht, pos_s)
+        trigger_on(ax, ht, pos_s)
         trig_on = [trig_on; 1];
         zone_sum = zone_sum + 1; % Increment time tracked in trigger zone
         
 %         Send D2 to 0V if outside of zone and currently at 5V
     elseif (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2)) %(pos_curr(3) <= ttl_zone(1)) || (pos_curr(3) >= ttl_zone(2))
-        trigger_off(a, ax, ht, pos_s)
+        trigger_off(ax, ht, pos_s)
         trig_on = [trig_on; 0];
         zone_sum = 0; % reset time in trigger zone to 0
         
@@ -189,9 +196,10 @@ save(save_loc, 'time', 'pos_s', 'trig_on');
 end
 
 %% Turn on LED/screen
-function [] = trigger_on(a, ax, ht, pos_curr)
+function [] = trigger_on(ax, ht, pos_curr)
 
 global D2value
+global a
 D2value = 1;
 % text_append = '';
 
@@ -213,9 +221,10 @@ ht.String = ['ON' text_append];
 end
 
 %% Turn off LED/screen
-function [] = trigger_off(a, ax, ht, pos_curr)
+function [] = trigger_off(ax, ht, pos_curr)
 
 global D2value
+global a
 D2value = 0;
 % text_append = '';
 
@@ -259,11 +268,16 @@ end
 
 %% Clean up function to make sure trigger gets turned off, timer stopped, global
 % vars cleared if function stops for any reason!!!
-function myCleanupFun(t, a, ax, ht, pos_curr)
+function myCleanupFun(t, ax, ht)
 
-try
-    trigger_off(a, ax, ht, pos_curr)
+global a
+
+%  try
+
+    trigger_off(ax, ht, nan)
+    keyboard
     clear a
+
     try
         fclose(instrfindall)
         delete(instrfindall)
@@ -273,9 +287,9 @@ try
 
     close(ax.Parent(1))
     disp('cleanup function ran!')
-catch
-    disp('error running cleanup function - clear all global variables manually!')
-end
+% catch
+%     disp('error running cleanup function - clear all global variables manually!')
+% end
 
 end
 
