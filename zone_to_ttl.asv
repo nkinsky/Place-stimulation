@@ -186,7 +186,6 @@ elseif D4value == 0
     D4value = 1;
 end
 writeDigitalPin(a,'D4',D4value);
-
 % Should give decent idea of when you stopped things...
 save(save_loc, 'time_opti', 'time_mat', 'pos_lin', 'pos_opti', 'trig_on', ...
     'on_minutes');
