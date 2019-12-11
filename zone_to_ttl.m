@@ -6,6 +6,7 @@ if nargin < 2
 end
 clear global
 global D2value
+global D4value
 global zone_sum
 global pos
 global pos_opti
@@ -16,7 +17,8 @@ global trig_on
 global save_loc
 global SR
 global a
-D2value = 0;
+global on_minutes  % Marker for on and minutes
+D2value = 0; D4value = 0;
 zone_sum = 0;
 
 save_loc = fullfile(folder, ['recording_' datestr(now,1) '.mat']);
@@ -36,10 +38,11 @@ SR = 20; %Hz
 nquarter = ceil(SR/4); % #samples in a quarter second
 pos = repmat([0 0 -500], nquarter, 1); % Start pos with z-position waaaay off
 pos_opti = [];
-pos_lin = [];
+pos_lin = [nan; nan];
 time_opti = [];
 time_mat = [];
 trig_on = [];
+on_minutes = [];
 
 % Make sure track is aligned with z axis in optitrack calibration first!
 % Connect to optitrack
@@ -120,33 +123,65 @@ t = timer('TimerFcn', @(x,y)zone_detect(trackobj, ax, ht, ttl_zone, theta, cente
     'ExecutionMode', 'fixedRate', 'TasksToExecute', SR*run_time); %, ...
 %     'StopFcn', @(x,y)trigger_off(a, ax, ht, pos));
 
+t2 = timer('TimerFcn', @(x,y)minute_marker(), 'StartFcn', @(x,y)minute_marker(),...
+    'Period', 60, 'ExecutionMode', 'fixedRate', 'TasksToExecute', run_time);
+
 % Create cleanup function
-cleanup = onCleanup(@()myCleanupFun(t, ax, ht));
+cleanup = onCleanup(@()myCleanupFun(t, t2, ax, ht));
 
 % start function!
 start(t)
-figure(hf); % bring figure to front
+start(t2)
 
 % While loop here - should be able to start or stop timer! maybe keyboard
 % statement? yes!
-disp('Type "stop(t); dbcont" to finish and save')
+disp('Type "stop(t); stop(t2); dbcont" to finish and save')
+figure(hf); % bring figure to front
 keyboard
 
+clear a
+
 % pause(run_time+3); % Don't get out of function until timer is done running
+
+end
+
+%% Start minute marker - turns on on even minutes and off on odd minutes
+function [] = minute_marker()
+global a
+global D4value
+
+if D4value == 0
+    D4value = 1;
+elseif D4value == 1
+    D4value = 0;
+end
+
+writeDigitalPin(a,'D4',D4value);
 
 end
 
 %% Start recording marker
 function [] = send_start()
 global a
-writeDigitalPin(a,'D4',1);
+global D4value
+D4value = 1;
+writeDigitalPin(a,'D4',D4value);
+
 
 end
 
-%% End recording marker
+%% End recording marker - switch D4value at end!!!
 function [] = send_end()
 global a
-writeDigitalPin(a,'D4',0);
+global D4value
+
+if D4value == 1
+    D4value = 0;
+elseif D4value == 1
+    D4value = 0;
+end
+writeDigitalPin(a,'D4',D4value);
+
 end
 
 
@@ -187,6 +222,8 @@ global trig_on
 global save_loc
 global zone_sum
 global SR
+global D4value
+global on_minutes
 
 delta_pos = capture_pos(c); % get position
 pos_curr = pos(end,:);
@@ -221,7 +258,11 @@ else % Logic to trigger is the rat is in the appropriate zone below
     
 end
 
-save(save_loc, 'time_opti', 'time_mat', 'pos_lin', 'pos_opti', 'trig_on');
+on_minutes = [on_minutes; D4value];
+
+
+save(save_loc, 'time_opti', 'time_mat', 'pos_lin', 'pos_opti', 'trig_on', ...
+    'on_minutes');
 
 end
 
@@ -298,7 +339,7 @@ end
 
 %% Clean up function to make sure trigger gets turned off, timer stopped, global
 % vars cleared if function stops for any reason!!!
-function myCleanupFun(t, ax, ht)
+function myCleanupFun(t, t2, ax, ht)
 
 global a
 
@@ -311,6 +352,7 @@ global a
         delete(instrfindall)
     end
     stop(t)
+    stop(t2)
 %     clear global
 
     close(ax.Parent(1))
