@@ -42,7 +42,7 @@ pos_lin = [nan; nan];
 time_opti = [];
 time_mat = [];
 trig_on = [];
-on_minutes = [];
+on_minutes = [false; false];
 
 % Make sure track is aligned with z axis in optitrack calibration first!
 % Connect to optitrack
