@@ -225,14 +225,7 @@ else % Logic to trigger is the rat is in the appropriate zone below
     
 end
 
-try 
-    writePWMDutyCycle(a, 'D6', linpos2dutycycle(pos_s))
-catch % set to 0 if you encounter a tracking error that sets the limits too far (probably best folded into linpos2dutycycle
-    try % make sure code doesn't completely error out if you encounter something truly unknown.
-        writePWMDutyCycle(a, 'D6', 0)
-    end
-end
-    
+writePWMDutyCycle(a, 'D6', linpos2dutycycle(pos_s))
 
 save(save_loc, 'time_opti', 'time_mat', 'pos_lin', 'pos_opti', 'trig_on');
 
@@ -314,21 +307,21 @@ end
 function myCleanupFun(t, ax, ht)
 
 global a
-writePWMDutyCycle(a, 'D6', 0);
-trigger_off(ax, ht, nan)
-send_end();
-port_use = a.Port;
-clear a
-fclose(serial(port_use));
-try
-    fclose(instrfindall)
-    delete(instrfindall)
-end
-stop(t)
+    writePWMdu
+    trigger_off(ax, ht, nan)
+    send_end();
+    port_use = a.Port;
+    clear a
+    fclose(serial(port_use));
+    try
+        fclose(instrfindall)
+        delete(instrfindall)
+    end
+    stop(t)
 %     clear global
 
-close(ax.Parent(1))
-disp('cleanup function ran!')
+    close(ax.Parent(1))
+    disp('cleanup function ran!')
 % catch
 %     disp('error running cleanup function - clear all global variables manually!')
 % end
@@ -341,8 +334,6 @@ function [dutycycle] = linpos2dutycycle(lin_pos)
 track_length_use = 20; % should be a lot longer than actual.
 
 dutycycle = double(lin_pos/track_length_use+0.5);
-
-if dutycycle < 0; dutycycle = 0; elseif dutycycle > 1; dutycycle = 1; end
 
 end
 
