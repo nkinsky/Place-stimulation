@@ -18,6 +18,7 @@ global save_loc
 global SR
 global a
 global on_minutes  % Marker for on and minutes
+global hl
 D2value = 0; D4value = 0;
 zone_sum = 0;
 
@@ -31,7 +32,7 @@ while exist(save_loc,'file')
     end
 end
 
-run_time = 60*60; %seconds
+run_time = 180*60; %seconds
 SR = 20; %Hz
 
 % Construct pos vector to keep track of last 0.25 seconds
@@ -74,10 +75,13 @@ if ~debug
 end
 
 % set up window sanity check
-hf = figure; ax = gca;
+hf = figure; set(gcf,'Position', [250 500 1100 430]); ax = subplot(1,2,1);
 imagesc(ax, 1);
 colormap(ax,[1 0 0])
 ht = text(ax, 1, 1, 'OFF', 'FontSize', 50, 'HorizontalAlignment', 'center');
+subplot(1,2,2);
+hl = plot(pos_lin); hold on;
+hl(2) = plot(pos_lin,'r.');
 
 % Make aware running in DEBUG mode, set arduino object to nan.
 if debug
@@ -179,6 +183,7 @@ global pos_lin
 global pos_opti
 global trig_on
 global on_minutes
+global save_loc
 
 if D4value == 1
     D4value = 0;
@@ -244,7 +249,7 @@ pos_lin = [pos_lin; pos_s];
 % than zone_thresh seconds
 zone_thresh = 3;
 if all(delta_pos == 0) || zone_sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 0.05 %
-    trigger_off(ax, ht, pos_curr)
+    trigger_off(ax, ht, pos_s)
     trig_on = [trig_on; 0];
     if (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2))
         zone_sum = 0; % reset time in trigger zone to 0
@@ -280,6 +285,9 @@ function [] = trigger_on(ax, ht, pos_curr)
 
 global D2value
 global a
+global pos_lin
+global trig_on
+global hl
 D2value = 1;
 % text_append = '';
 
@@ -297,6 +305,9 @@ text_append = ['-' num2str(pos_use, '%0.2g')];
 
 colormap(ax,[0 1 0])
 ht.String = ['ON' text_append];
+hl(1).YData = pos_lin;
+hl(2).XData = find(trig_on == 1);
+hl(2).YData = pos_lin(trig_on == 1);
 
 end
 
@@ -305,6 +316,9 @@ function [] = trigger_off(ax, ht, pos_curr)
 
 global D2value
 global a
+global hl
+global pos_lin
+global trig_on
 D2value = 0;
 % text_append = '';
 
@@ -321,6 +335,9 @@ text_append = ['-' num2str(pos_use, '%0.2g')];
 
 colormap(ax,[1 0 0])
 ht.String = ['OFF' text_append];
+hl(1).YData = pos_lin;
+hl(2).XData = find(trig_on == 1);
+hl(2).YData = pos_lin(trig_on == 1);
 
 end
 
