@@ -1,8 +1,11 @@
-function [] = zone_to_ttl(folder,debug)
+function [] = zone_to_ttl(folder, port, debug)
 % Function to ID track and zones to trigger TTL out pulses
 
-if nargin < 2
+if nargin < 3
     debug = false;
+    if nargin < 2;
+        port = nan;
+    end
 end
 clear global
 global D2value
@@ -64,7 +67,12 @@ if ~debug
         end
             
         % now connect
-        a = arduino;
+        if isnan(port)
+            a = arduino;
+        else
+            a = arduino(port);
+        end
+        disp(['CONNECTED TO ARDUINO ON ' port])
         configurePin(a,'D2','DigitalOutput');  % for stimulation - send to stim board
         configurePin(a,'D4','DigitalOutput');  % for tracking recording start/end - send to acquisition system
         configurePin(a,'D6','PWM');  % for outputting position along track to acquisition system
