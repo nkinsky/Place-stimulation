@@ -35,7 +35,7 @@ while exist(save_loc,'file')
     end
 end
 
-run_time = 180*60; %seconds
+run_time = 240*60; %seconds
 SR = 20; %Hz
 
 % Construct pos vector to keep track of last 0.25 seconds
