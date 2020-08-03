@@ -261,14 +261,14 @@ pos_lin = [pos_lin; pos_s];
 % than zone_thresh seconds
 pos_last5 = pos_lin(max([1, length(pos_lin)-5]):end);
 delta_pos_last5 = diff(pos_last5);
-zone_thresh = 3;
+zone_thresh = 6;
 if all(delta_pos_last5 == 0) || zone_sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 0.05 %
     trigger_off(ax, ht, pos_curr)
-    if all(delta_pos == 0)
-        disp('turned off b/c no movement/tracking error')
-    else
-       disp('turned off b/c too much time in zone')
-    end
+%     if all(delta_pos == 0)
+%         disp('turned off b/c no movement/tracking error')
+%     else
+%        disp('turned off b/c too much time in zone')
+%     end
     trig_on = [trig_on; 0];
     if (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2))
         zone_sum = 0; % reset time in trigger zone to 0
