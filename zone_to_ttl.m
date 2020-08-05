@@ -264,11 +264,11 @@ delta_pos_last5 = diff(pos_last5);
 zone_thresh = 6;
 if all(delta_pos_last5 == 0) || zone_sum >= zone_thresh*SR %sqrt(sum(delta_pos.^2)) < 0.05 %
     trigger_off(ax, ht, pos_curr)
-%     if all(delta_pos == 0)
-%         disp('turned off b/c no movement/tracking error')
-%     else
-%        disp('turned off b/c too much time in zone')
-%     end
+    if all(delta_pos == 0)
+        disp('turned off b/c no movement/tracking error')
+    else
+       disp('turned off b/c too much time in zone')
+    end
     trig_on = [trig_on; 0];
     if (pos_s <= ttl_zone(1)) || (pos_s >= ttl_zone(2))
         zone_sum = 0; % reset time in trigger zone to 0
@@ -291,13 +291,14 @@ else % Logic to trigger is the rat is in the appropriate zone below
     
 end
 
-try 
-    writePWMDutyCycle(a, 'D6', linpos2dutycycle(pos_s))
-catch % set to 0 if you encounter a tracking error that sets the limits too far (probably best folded into linpos2dutycycle
-    try % make sure code doesn't completely error out if you encounter something truly unknown.
-        writePWMDutyCycle(a, 'D6', 0)
-    end
-end
+% good idea but it dumps TONS of noise into the system.
+% try 
+%     writePWMDutyCycle(a, 'D6', linpos2dutycycle(pos_s))
+% catch % set to 0 if you encounter a tracking error that sets the limits too far (probably best folded into linpos2dutycycle
+%     try % make sure code doesn't completely error out if you encounter something truly unknown.
+%         writePWMDutyCycle(a, 'D6', 0)
+%     end
+% end
     
 on_minutes = [on_minutes; D4value];
 
